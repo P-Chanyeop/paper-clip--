@@ -57,6 +57,7 @@ See [`rules/README.md`](rules/README.md) for rule authoring and Greptile setup.
 - `cli/`: `paperclipai` CLI package (published bin, agent-facing commands)
 - `skills/`: Paperclip runtime/operational skills (not part of the app catalog)
 - `doc/`: operational and product docs
+- Fork additions (`companies/`, `mvp/`, `skills/kr-*`, `scripts/kr/`): see [`FORK-CONVENTIONS.md`](FORK-CONVENTIONS.md)
 
 ## 4. Dev Setup (Auto DB)
 
