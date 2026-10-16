@@ -55,15 +55,29 @@ AGENTS.md §7은 PR 핸드오프 전 `pnpm -r typecheck && pnpm test:run && pnpm
 
 ### 2-3. PR에서 항상 돌는 CI (`policy` job, `.github/workflows/pr-trusted.yml`)
 
+검증 단계는 **15개**다. 실행 순서대로(`pr-trusted.yml:86-137`, 직접 확인).
+절반이 검사 스크립트 **자기 테스트**임에 유의 — 검사기가 깨지면 여기서 걸린다.
+
 ```
-node .github/scripts/check-pr-migration-order.mjs
-node ./scripts/check-docker-deps-stage.mjs
-pnpm check:node-version
-node ./scripts/check-no-git-push.mjs
-pnpm check:module-boundaries
-node ./scripts/release-package-map.mjs check
-pnpm install --resolution-only --ignore-scripts --no-frozen-lockfile
+node .github/scripts/check-pr-migration-order.mjs      # L86
+node ./scripts/check-docker-deps-stage.mjs             # L92
+pnpm check:node-version                                # L95
+node ./scripts/check-no-git-push.mjs                   # L98
+node --test ./scripts/check-no-git-push.test.mjs       # L101
+pnpm check:module-boundaries                           # L104
+node --test ./scripts/check-module-boundaries.test.mjs # L107
+node --test '.github/scripts/tests/*.test.mjs'         # L110
+node --test .../run-vitest-stable-shard.test.mjs       # L113
+node --test .../e2e-shard.test.mjs                     # L116
+node --test .../release-verify-workflow.test.mjs       # L119 (+2개 더)
+node --test .../build-standalone-concurrency.test.mjs  # L122
+node ./scripts/release-package-map.mjs check           # L125
+node ./scripts/check-release-package-bootstrap.mjs     # L128
+pnpm install --resolution-only --ignore-scripts --no-frozen-lockfile  # L136
 ```
+
+(`node --test`는 실제로는 `$CI_NODE_TEST`로, 체크아웃에
+`scripts/ci-profile/node-test.mjs`가 있으면 그쪽을 쓴다 — `pr-trusted.yml:48-55`.)
 
 위 명령 목록 외에 `policy`에는 `pnpm-lock.yaml` **하드 차단** 단계가 하나 더 있다
 ("Block manual lockfile edits", `pr-trusted.yml:57-68`). 이 단계는 브랜치가
@@ -78,7 +92,12 @@ CI가 잡는다.
 ### 2-4. commitperclip 봇 (`.github/workflows/commitperclip-review.yml`)
 
 `node .github/scripts/run-quality-gates.mjs`가 아래를 검사하고 PR에 코멘트를 남긴다.
-**CI를 실패시키지는 않는다** — 코멘트만 달린다.
+
+⚠️ **이 job은 CI를 실패시킨다.** 게이트 실행 단계 자체는
+`continue-on-error: true`지만(`commitperclip-review.yml:49`), 바로 다음 단계가
+`steps.quality.outcome == 'failure'`일 때 `exit 1`로 job을 떨어뜨린다
+(`commitperclip-review.yml:57-63`). 즉 "코멘트만 달리고 끝난다"로 읽으면 안 된다.
+`dependabot[bot]`이 올린 PR에서만 두 단계가 모두 건너뛰어진다.
 
 | 스크립트 | 검사 내용 |
 |---|---|
@@ -203,8 +222,11 @@ CI가 잡는다.
    kebab-case로 변경 내용을 설명해야 한다.
 7. **스크린샷을 저장소에 커밋하지 말 것.** `docs/pr-screenshots/` 아래 커밋 금지.
    단, `doc/` 가이드에 포함된 제품 문서용 이미지는 허용.
-   ⚠️ 현재 저장소에 `docs/pr-screenshots/pr-15695`, `pr-15731`, `pr-15773`가
-   **이미 커밋돼 있다.** 규약과 현재 상태가 어긋나 있으니 신규 추가만 지적한다.
+   ⚠️ 현재 저장소에 `docs/pr-screenshots/` 아래 디렉터리가 **11개 이미 커밋돼
+   있다** (`pap-2837`, `pap-2944`, `pap-2945`, `pr-4616`, `pr-5291`, `pr-5356`,
+   `pr-5428`, `pr-6384`, `pr-15695`, `pr-15731`, `pr-15773` — 기준 `f2ffcf3a0`,
+   `git ls-files docs/pr-screenshots`). 규약과 현재 상태가 어긋나 있으니
+   신규 추가만 지적한다.
 8. **세 가지 데이터 경로를 구분.** `AGENTS.md` §5 규칙 7 — 경로로 판단하고
    단어로 판단하지 말 것:
    - **Telemetry** (`packages/shared/src/telemetry/**`) → **엄격 리뷰.**
@@ -212,7 +234,9 @@ CI가 잡는다.
      기본값이 opt-out이고 Paperclip 엔드포인트로 즉시 전송된다.
    - **Observability** (`server/src/instrumentation.ts`,
      `packages/adapter-utils/src/duplex-observability.ts`,
-     `acpx-engine/startup-timing.ts`, `doc/observability.md`) → **가벼운 리뷰.**
+     `server/src/services/duplex-observability-recorder.ts`,
+     `acpx-engine/startup-timing.ts`, `doc/observability.md`
+     — 목록은 `AGENTS.md:129-134`) → **가벼운 리뷰.**
      span 속성 allowlist 안에 머물면 프라이버시 리뷰 불필요.
    - **run log** (`packages/db/src/schema/heartbeat_run_events.ts`,
      `appendRunEvent`, `doc/run-log-events.md`) → **추가 리뷰 불필요.**
@@ -228,8 +252,11 @@ CI가 잡는다.
     → **한 층만 바뀐 PR은 계약 불일치 의심.**
 11. **새 엔드포인트 요건.** `AGENTS.md` §8 — 회사 접근 검사, 액터 권한(board vs agent),
     변경 작업의 activity log 기록, 일관된 HTTP 에러(`400/401/403/404/409/422/500`).
-12. **PR 본문 문체.** `CONTRIBUTING.md` — ASD-STE100(Simplified Technical English).
-    짧은 문장, 한 문장 한 지시, 능동태. Thinking Path는 5~8단계.
+12. **PR 본문 문체.** ASD-STE100(Simplified Technical English) —
+    짧은 문장, 한 문장 한 지시, 능동태 (`CONTRIBUTING.md:173`,
+    `.github/PULL_REQUEST_TEMPLATE.md:1`). **Thinking Path 5~8단계**의 출처는
+    `CONTRIBUTING.md`가 아니라 `.github/PULL_REQUEST_TEMPLATE.md:9`다
+    (`CONTRIBUTING.md:175-197`은 단계 수 없이 예시만 준다).
 13. **기능 PR.** `ROADMAP.md` 확인 + Discord `#dev` 사전 논의가 요구된다.
     조율되지 않은 코어 기능 PR은 품질과 무관하게 닫힐 수 있다.
 
@@ -329,10 +356,11 @@ CI가 잡는다.
    - 직접 확인함: job 12개 이름과 `needs`/`if` 조건, `verify` 판정 로직(L587-626),
      `general_tests` 19 레인 매트릭스(L347-443), `e2e_shards` 8샤드(L1444-),
      `verify_serialized_server` 9샤드.
-   - 하위 조사 에이전트 보고를 옮긴 부분: §2-3 `policy` job의 개별 명령 목록,
-     §2-4 commitperclip 동작, `ci-routing.yml`의 `full_ci` 결정 조건.
-     명령 문자열은 `package.json`·`.github/scripts/` 파일 존재로 교차 확인했으나,
-     **`policy` job 내 실행 순서와 조건부 분기는 미확인이다.**
+   - 추가로 직접 확인함(2026-10-16 재대조): §2-3 `policy` job의 15개 검증 단계와
+     실행 순서(L86-137), 락파일 하드 차단 단계(L57-68), §2-4 commitperclip이
+     `exit 1`로 job을 떨어뜨리는 경로(`commitperclip-review.yml:49,57-63`).
+   - 하위 조사 에이전트 보고를 옮긴 부분: `ci-routing.yml`의 `full_ci` 결정 조건.
+     **미확인이다.**
    - `check:token-gates`/ESLint 부재는 `.github/` 및 `git ls-files` 직접 확인.
 3. **`.greptile/` 설정 내용을 확인하지 않았다.** Greptile 5/5가 구체적으로 무엇을
    요구하는지는 이 문서 범위 밖이다.

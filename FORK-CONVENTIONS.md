@@ -261,14 +261,17 @@ node scripts/kr/extract-strings.mjs --dir ui/src/pages
   업스트림 파일이고 머지 충돌 지점이다. `node scripts/kr/<파일>`로 직접 호출한다.
 - **새 의존성을 추가하지 않는다.** `pnpm-lock.yaml`을 커밋하면 **서로 다른 조건의
   검사 두 개**에 걸린다. 조건이 다르므로 하나만 인용하면 틀린다.
-  - **CI `policy` job — 하드 실패.**
+  **둘 다 CI를 실패시킨다.**
+  - **CI `policy` job.**
     `.github/workflows/pr-trusted.yml:57-68`의 "Block manual lockfile edits"
     단계는 브랜치가 `chore/refresh-lockfile`이거나 작성자가 `dependabot[bot]`일
     때 **건너뛴다.** 즉 예외는 둘 중 **하나만** 만족하면 된다(OR).
-  - **commitperclip 봇 — 코멘트만, CI를 실패시키지 않는다.**
+  - **commitperclip 봇.**
     `.github/scripts/check-pr-lockfile.mjs:13-14`는 작성자가
     `github-actions[bot]`이고 **동시에** 브랜치가 `chore/refresh-lockfile`일
     때만 통과시킨다(AND). 주체(`github-actions[bot]`)와 결합(AND)이 위와 다르다.
+    게이트가 실패하면 `commitperclip-review.yml:57-63`이 `exit 1`로 job을
+    떨어뜨린다 — 코멘트만 달고 끝나지 않는다.
 
   두 예외 모두 포크의 한국어화 작업에는 해당되지 않는다. 이미 루트에 선언된
   의존성만 쓴다.
