@@ -1,0 +1,42 @@
+name: Token Gates
+
+on:
+  pull_request:
+    paths:
+      - "ui/**"
+      - "packages/shared/src/cliplab/**"
+      - "scripts/check-token-gates.mjs"
+      - "scripts/sync-agent-palette-tokens.mjs"
+      - "scripts/sync-cliplab-character.mjs"
+      - ".github/workflows/token-gates.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: token-gates-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gates:
+    name: Design token gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 9.15.4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Check design token gates
+        run: pnpm check:token-gates
