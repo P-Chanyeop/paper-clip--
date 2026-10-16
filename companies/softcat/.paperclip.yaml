@@ -1,0 +1,38 @@
+# Paperclip 벤더 확장
+# 기본 패키지(COMPANY.md 등)에 담을 수 없는 런타임 설정만 여기 둔다.
+schema: paperclip/v1
+
+agents:
+  # 네 에이전트 모두 Claude Code로 실행한다.
+  ceo:
+    adapter:
+      type: claude_local
+  reviewer:
+    adapter:
+      type: claude_local
+    inputs:
+      env:
+        # PR에 리뷰 코멘트를 달기 위해 필요하다.
+        GH_TOKEN:
+          kind: secret
+          requirement: optional
+  engineer:
+    adapter:
+      type: claude_local
+    inputs:
+      env:
+        # PR 생성과 푸시에 필요하다.
+        GH_TOKEN:
+          kind: secret
+          requirement: optional
+  researcher:
+    adapter:
+      type: claude_local
+
+routines:
+  weekly-report:
+    triggers:
+      - kind: schedule
+        # 매주 금요일 17:00 (한국 시간)
+        cronExpression: "0 17 * * 5"
+        timezone: Asia/Seoul
