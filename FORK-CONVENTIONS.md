@@ -259,9 +259,18 @@ node scripts/kr/extract-strings.mjs --dir ui/src/pages
 
 - **루트 `package.json`에 포크 전용 `scripts` 항목을 추가하지 않는다.**
   업스트림 파일이고 머지 충돌 지점이다. `node scripts/kr/<파일>`로 직접 호출한다.
-- **새 의존성을 추가하지 않는다.** `pnpm-lock.yaml` 수정은 `dependabot[bot]`
-  또는 `chore/refresh-lockfile` 브랜치가 아니면 CI `policy` job에서 **거부된다**
-  (`skills/kr-code-review/references/repo-facts.md` §2-3). 이미 루트에 선언된
+- **새 의존성을 추가하지 않는다.** `pnpm-lock.yaml`을 커밋하면 **서로 다른 조건의
+  검사 두 개**에 걸린다. 조건이 다르므로 하나만 인용하면 틀린다.
+  - **CI `policy` job — 하드 실패.**
+    `.github/workflows/pr-trusted.yml:57-68`의 "Block manual lockfile edits"
+    단계는 브랜치가 `chore/refresh-lockfile`이거나 작성자가 `dependabot[bot]`일
+    때 **건너뛴다.** 즉 예외는 둘 중 **하나만** 만족하면 된다(OR).
+  - **commitperclip 봇 — 코멘트만, CI를 실패시키지 않는다.**
+    `.github/scripts/check-pr-lockfile.mjs:13-14`는 작성자가
+    `github-actions[bot]`이고 **동시에** 브랜치가 `chore/refresh-lockfile`일
+    때만 통과시킨다(AND). 주체(`github-actions[bot]`)와 결합(AND)이 위와 다르다.
+
+  두 예외 모두 포크의 한국어화 작업에는 해당되지 않는다. 이미 루트에 선언된
   의존성만 쓴다.
 - **저장소를 수정하는 동작을 기본값으로 두지 않는다.** 측정과 치환을 한 파일에
   섞지 않는다. 치환 도구는 별도 파일로 만들고, 쓰기 경로를 인자로 받는다.
@@ -321,7 +330,11 @@ node scripts/kr/extract-strings.mjs --dir ui/src/pages
 
 1. **`companies/softcat/README.md` 드리프트.** README는 "시작 작업 2개"와
    `tasks/{repo-orientation,first-pr-review}`를 적고 있지만, 실제 작업
-   디렉터리는 7개다(`786ad3c0f`에서 5개 추가). §1-3 ⑤의 규약은 세웠으나
+   디렉터리는 **7개**다 — 기준 `f77c46408`,
+   범위 `companies/softcat/projects/code-review-automation/tasks/*/`
+   (`786ad3c0f`에서 5개 추가). 같은 기준에서 `companies/softcat/` 전체의
+   `TASK.md`는 **8개**인데, 차이 1개는 프로젝트 밖의 회사 단위 작업
+   `companies/softcat/tasks/weekly-report/`다. §1-3 ⑤의 규약은 세웠으나
    **기존 드리프트는 고치지 않았다** — 이 PR의 범위가 아니다. 별도 작업이 필요하다.
 2. **존재하지 않는 스크립트 참조 2건.** `mvp/glossary-ko.md:4` →
    `scripts/kr/translate-locale.mjs`, `scripts/kr/extract-strings.mjs` 헤더 →
