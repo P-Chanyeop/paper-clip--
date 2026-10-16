@@ -46,6 +46,40 @@ function isMachineString(text) {
   return false;
 }
 
+/** 스타일 전용 prop. 이 안의 문자열은 클래스명·스타일값이라 번역 대상이 아니다. */
+const STYLE_PROPS = new Set(["className", "class", "style", "tw", "classNames"]);
+
+/** 클래스 조합 함수. 인자 문자열은 Tailwind 클래스다. */
+const CLASS_FUNCTIONS = new Set(["cn", "clsx", "cva", "twMerge", "classNames", "cx", "tv"]);
+
+/**
+ * 공백으로 나뉜 토큰이 전부 클래스명처럼 생겼는지.
+ * 예: "flex items-start gap-3", "bg-yellow-500/20 dark:text-red-300"
+ * 한계: 전부 소문자인 진짜 UI 문구("no results")도 걸러질 수 있다.
+ * UI 문구는 대개 대문자로 시작하므로 측정 오차는 작다.
+ */
+function looksLikeClassList(text) {
+  const tokens = text.trim().split(/\s+/);
+  return tokens.every((t) => /^!?-?[a-z0-9@][a-z0-9:/.\[\]()%_#,=&>~+*-]*$/.test(t));
+}
+
+function isInsideStyleContext(path) {
+  let current = path.parentPath;
+  while (current) {
+    const node = current.node;
+    if (node.type === "JSXAttribute" && STYLE_PROPS.has(node.name?.name)) return true;
+    if (node.type === "CallExpression") {
+      const callee = node.callee;
+      const name = callee.type === "Identifier" ? callee.name
+        : callee.type === "MemberExpression" ? callee.property?.name : null;
+      if (name && CLASS_FUNCTIONS.has(name)) return true;
+    }
+    if (node.type === "JSXElement" || node.type === "Program") return false;
+    current = current.parentPath;
+  }
+  return false;
+}
+
 function listFiles(dir) {
   const out = [];
   const walk = (d) => {
@@ -124,9 +158,11 @@ for (const file of listFiles(join(ROOT, targetDir))) {
     JSXExpressionContainer(path) {
       path.traverse({
         StringLiteral(inner) {
-          if (/\s/.test(inner.node.value.trim())) {
-            record(inner.node.value, "jsx-expr", inner.node);
-          }
+          const value = inner.node.value.trim();
+          if (!/\s/.test(value)) return;
+          if (isInsideStyleContext(inner)) return;
+          if (looksLikeClassList(value)) return;
+          record(inner.node.value, "jsx-expr", inner.node);
         },
       });
     },
