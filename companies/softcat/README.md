@@ -12,7 +12,20 @@
 paperclipai company import --from ./companies/softcat
 ```
 
-또는 Paperclip 화면의 **Company Import**에서 이 폴더를 지정한다.
+정확한 사용법은 `paperclipai company import <경로또는URL>` 이다.
+`--from` 플래그가 아니라 **위치 인자**다. `--dry-run` 으로 먼저 미리보기를 볼 것.
+
+### 화면에서 올리기 (zip 필요)
+
+`<호스트>/<회사프리픽스>/company/import` 는 **`.zip`만 받는다.** 폴더는 안 된다.
+zip은 최상위 폴더 안에 `COMPANY.md`가 있어야 한다:
+
+```sh
+cd companies && zip -r ../softcat.zip softcat
+```
+
+생성된 zip은 커밋하지 않는다. 원본과 중복되고, 패키지가 바뀌면 낡은 zip을
+import하게 되는 함정이 된다. 필요할 때마다 위 명령으로 다시 만든다.
 
 > ⚠️ import 직후 **예산부터 거세요.** 기본값은 무제한입니다.
 > 회사 한도만 걸면 에이전트 하나가 폭주할 때 전사가 멈춥니다.
