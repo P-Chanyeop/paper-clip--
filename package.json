@@ -98,6 +98,8 @@
     "test:lifecycle-baseline:typecheck": "tsc -p tests/lifecycle-baseline/tsconfig.json"
   },
   "devDependencies": {
+    "@babel/parser": "7.29.8",
+    "@babel/traverse": "7.29.8",
     "@playwright/test": "^1.62.1",
     "agentmail": "^0.5.31",
     "cross-env": "^10.1.0",
